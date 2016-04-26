@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" type="text/css" href="style/main.css" />
+</head>
+<!-- Tree Plot Diagram Quis 2 -->
+<body>
+  <script src="http://d3js.org/d3.v3.min.js"></script>
+  <script src="colorbrewer.js"></script>
+  <script>
+      var margin = {top: 40, left: 40, bottom: 20, right: 20},
+          width = 1000 - margin.left - margin.right
+          height = 500 - margin.top - margin.bottom;
+
+      var xscale = d3.scale.linear()
+          .range([0, width-2])
+          .domain([0, 20]);
+
+      var yscale = d3.scale.linear()
+          .range([height-2, 0])
+          .domain([0, 20]);
+
+      var radscale = d3.scale.linear()
+          .range([4, 6]);
+
+      var body = d3.select("body");
+
+      var xGrid = d3.svg.axis()
+          .scale(xscale)
+          .orient("bottom")
+          .tickSize(-height, 0, 0)
+          .ticks(4);
+
+      var yGrid = d3.svg.axis()
+          .scale(yscale)
+          .orient("left")
+          .ticks(4)
+          .tickSize(-width, 0, 0);
+
+      contain = body.append("div")
+        .attr("class", "buttons-container");
+
+      restore = contain.append("div")
+          .attr("class", "r button");
+
+      restore.append("p")
+          .text("All Trees");
+
+      measured = contain.append("div")
+          .attr("class", "button");
+
+      measured.append("p")
+          .text("Explore Measured")
+
+      var svg = body.append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+            .call(d3.behavior.zoom().scaleExtent([1, 8]).on("zoom", zoom));
+
+      colormap = d3.scale.ordinal()
+            .range(colorbrewer.Paired[12]);
+
+      function key(d) {
+          return d.ID;
+      }
+
+      var tooltip = body.append("div")
+          .attr("class", "infobubble")
+          .text("a simple tooltip");
+
+      var exploredata = "nothing";
+
+      species = ["Alchornea","Brosimum","Casearea","Cecropia","Eugenia ","Ficus","Hevea",
+      "Macrolobium","Mauritia","Mauritiella","Mouriri","Oxandra",
+      "Paranarcornea","Pouteria","Sinfonea","Tabebuia","Virola pavonis"];
+
+      measures = ["Tree_Height", "Flux_CH4", "Flux_CH4_mg", "Flux_CO2", "Flux_CO2_mg"];
+
+      spec = "all";
+
+      var species_container = body.append("div")
+          .attr("class", "species_container")
+          .selectAll("div")
+          .data(species)
+        .enter().append("div")
+          .text(function(d){ return d; })
+          .attr("class", function(d) {
+              if (d == spec) {
+                return "spec selected";
+              } else {
+                return "spec";
+              }
+          });
+
+      species_container.append("svg")
+            .attr("class", "left")
+            .attr("height", 12)
+            .attr("width", 15)
+          .append("circle")
+            .attr("cx", 4)
+            .attr("cy", 7.5)
+            .attr("r", 4)
+            .attr("fill", function(d){ return colormap(d); });
+
+      var measures_container = body.append("div")
+          .attr("class", "measures_container")
+          .selectAll("div")
+          .data(measures)
+        .enter().append("div")
+          .text(function(d){ return d; })
+          .attr("class", function(d) {
+              if (d == exploredata) {
+                return "measure left m_selected";
+              } else {
+                return "measure left";
+              }
+            });
+
+      d3.csv("workingdata_added.csv", function(error, data) {
+          var treepoints = data;
+
+          var treeGroup = svg.append("g")
+              .attr("class", "point");
+
+          svg.append("g")
+                  .call(xGrid)
+                  .attr("transform", "translate(0," + height + ")")
+                  .attr("class", "grid");
+
+          svg.append("g")
+                  .call(yGrid)
+                  .attr("class", "grid");
+
+          var trees= treeGroup.selectAll("circle")
+              .data(treepoints, key)
+            .enter().append("circle")
+              .attr("cx", function(d){ return xscale(d.X); })
+              .attr("cy", function(d){ return yscale(d.Y); })
+              .attr("r", 4)
+              .attr("fill", function(d){ return colormap(d.Species) });
+
+          species_container.on("click", function(d){
+              d3.select(".selected")
+                .classed("selected", false);
+
+              d3.select(this)
+                .classed("selected", true);
+
+              spec = d;
+
+              trees.data(treepoints)
+                .attr("visibility", function(element){
+                  if (element.Species == spec){ return "visible" }else{ return "hidden" }
+                });
+          });
+
+          measures_container.on("click", function(d){
+              d3.select(".m_selected")
+                .classed("m_selected", false);
+
+              d3.select(this)
+                .classed("m_selected", true);
+
+              exploredata = d;
+
+              trees.data(treepoints)
+                .transition(800).attr("r", function(element){
+                  if (exploredata == "Tree_Height") {
+                    radscale.domain([5, d3.max(treepoints, function(d){ if (d.Tree_Height != "NA") return d.Tree_Height })]);
+                    if(element.Tree_Height != "NA") {return radscale(element.Tree_Height);};
+                  } else if (exploredata == "Flux_CH4") {
+                    radscale.domain([-0.004, d3.max(treepoints, function(d){ if (d.Flux_CH4 != "NA") return d.Flux_CH4 })]);
+                    if (element.Flux_CH4 != "NA") {return radscale(element.Flux_CH4);};
+                  } else if (exploredata == "Flux_CH4_mg"){
+                    radscale.domain([-720, d3.max(treepoints, function(d){ if (d.Flux_CH4_mg != "NA") return d.Flux_CH4_mg })]);
+                    if (element.Flux_CH4_mg != "NA"){return radscale(element.Flux_CH4_mg);};
+                  } else if (exploredata == "Flux_CO2") {
+                    radscale.domain([0.7, d3.max(treepoints, function(d){ if (d.Flux_CO2 != "NA") return d.Flux_CO2 })]);
+                    if (element.Flux_CO2 != "NA"){return radscale(element.Flux_CO2);};
+                  } else if (exploredata == "Flux_CO2_mg") {
+                    radscale.domain([84, d3.max(treepoints, function(d){ if (d.Flux_CO2_mg != "NA") return d.Flux_CO2_mg })]);
+                    if (element.Flux_CO2_mg != "NA"){return radscale(element.Flux_CO2_mg);};
+                  }
+                });
+          });
+
+          restore.on("click", function(d){
+              d3.select(".selected")
+                .classed("selected", false);
+
+              d3.select(".m_selected")
+                .classed("m_selected", false);
+
+              trees.data(treepoints).transition(800).attr("r", 4).attr("visibility", "visible");
+          });
+
+          measured.on("click", function(d){
+            d3.select(".selected")
+              .classed("selected", false);
+
+            trees.data(treepoints)
+                .attr("visibility", function(d){ if (d.Palm == "NA"){ return "hidden" }else{ return "visible" } });
+          });
+
+          trees.on("mouseover", function(d){
+              if (exploredata == "nothing" || d.Palm == "NA") {
+                return tooltip.style("visibility", "visible").text(d.Species);
+              } else if (exploredata == "Tree_Height") {
+                return tooltip.style("visibility", "visible").text(d.Species + " " + d.Tree_Height + "m");
+              } else if (exploredata == "Flux_CH4") {
+                return tooltip.style("visibility", "visible").text(d.Species + " " + d.Flux_CH4 + " ppm/minute");
+              } else if (exploredata == "Flux_CH4_mg") {
+                return tooltip.style("visibility", "visible").text(d.Species + " " + d.Flux_CH4_mg + " micrograms");
+              } else if (exploredata == "Flux_CO2") {
+                return tooltip.style("visibility", "visible").text(d.Species + " " + d.Flux_CO2 + " ppm/minute");
+              } else if (exploredata == "Flux_CO2_mg") {
+                return tooltip.style("visibility", "visible").text(d.Species + " " + d.Flux_CO2_mg + " micrograms");
+              }
+          });
+
+          trees.on("mousemove", function(){return tooltip.style("top",
+            (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");});
+
+          trees.on("mouseout", function(){return tooltip.style("visibility", "hidden");});
+      });
+
+      function zoom() {
+          svg.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+      }
+
+  </script>
+</body>
+</html>
